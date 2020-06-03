@@ -34,17 +34,8 @@ class NetModel:
     Creates a thickness model of the net by creating all strand intersections
     ("knots") at the correct location given number of slots in the dies and the
     angle.  The knot stores its location thickness and slot number of both the
-    insidee and outside die that created it.  The thickess can be varied usingipytyh
+    inside and outside die that created it.  The thickess can be varied using
     several included methods.
-
-    Parameters:
-    slots_in = Number of slots in inside die.
-    slots_out = Number of slots in outside die.
-    angle_in = angle from web centerline to strand fromed by inside die.
-    angle_out = angle from web centerline to strand formed by outside die.
-    net_width = width of net in lenght units.
-    net_length = length of net in longest die rotations.
-    net_thickness = initial thickness of net in length units.
     '''
     def __init__(self):
         self.probe_pts = []
@@ -60,8 +51,9 @@ class NetModel:
         self.angle_out = 0
         self.knots = []
         self.tol = 0.
-
-        return
+        self.min_thkns = 0
+        self.max_thkns = 0
+        self.avg_thkns = 0
 
     def create_net(self, slots_in, slots_out, angle_in, angle_out, net_width,
                    net_length, net_thickness):
@@ -124,7 +116,7 @@ class NetModel:
                     cpt['location'][1] >= (0 - self.tol) and
                     cpt['location'][1] <= (self.net_length + self.tol))
 
-        def inbound_TR(cpt):
+        def inbound_tr(cpt):
             '''
             returns True if x value is <= width and y value <= length.
             '''
@@ -187,7 +179,7 @@ class NetModel:
             goodrow = False
             while inbounds(cpt):
                 cpt = newpt_v1_neg(cpt)
-            while (not (inbounds(cpt)) and inbound_TR(cpt)):
+            while (not (inbounds(cpt)) and inbound_tr(cpt)):
                 cpt = newpt_v1_pos(cpt)
             if inbounds(cpt):
                 rowstart = cpt
@@ -209,7 +201,7 @@ class NetModel:
             goodrow = False
             while inbounds(cpt):
                 cpt = newpt_v1_neg(cpt)
-            while (not (inbounds(cpt)) and inbound_TR(cpt)):
+            while (not (inbounds(cpt)) and inbound_tr(cpt)):
                 cpt = newpt_v1_pos(cpt)
             if inbounds(cpt):
                 rowstart = cpt
@@ -235,7 +227,6 @@ class NetModel:
             variation = magnitude * sin((2.0 * pi * cycles * x /
                                          self.net_width) + offset)
             knot['thickness'] += variation
-        return
 
     def md_variator(self, cycles, magnitude, offset=0):
         '''
@@ -256,7 +247,6 @@ class NetModel:
             y = knot['location'][1]
             variation = magnitude * sin(2.0 * pi * (y * cycles / Ldr) + offset)
             knot['thickness'] += variation
-        return
 
     def indie_variator(self, cycles, magnitude, offset=0):
         '''
@@ -297,7 +287,6 @@ class NetModel:
 
         for knot in self.knots:
             knot['thickness'] = new_thkns
-        return
 
     def set_average(self, new_average):
         '''
@@ -320,7 +309,6 @@ class NetModel:
         scaler = new_range / (maxt - mint)
         for knot in self.knots:
             knot['thickness'] = (knot['thickness'] - avg) * scaler + avg
-        return
 
     def copy(self):
         '''
@@ -356,7 +344,6 @@ class NetModel:
                   .format(knot['location'][0], knot['location'][1],
                           knot['thickness'], knot['slot_in'],
                           knot['slot_out']))
-        return
 
     def print_net_stats(self):
         '''
@@ -387,13 +374,29 @@ class NetModel:
         print("Thickness average of all knots = {:.4f}".format(avg))
         print("Thickness max = {:.4f}, min = {:.4f}, range = {:.4f}"
               .format(maxt, mint, maxt-mint))
-        return
 
     def print_probe_data(self):
-        print('\n   X        Y     THK')
+        '''Prints out data from thickness probe.'''
+        print('\n   X        Y       THK')
         for dp in self.probe_samples:
-            print('{:6.2f} {:8.2f} {:6.3f}'.format(dp[0][0], dp[0][1], dp[1]))
-        return
+            print('{:6.2f} {:8.2f} {:8.4f}'.format(dp[0][0], dp[0][1], dp[1]))
+
+    def print_probe_stats(self):
+        '''Prints stats from current thickness probe data.'''
+        print('\nNumber of samples = {:d}'.format(len(self.probe_samples)))
+        print('Average thickness = {:0.4f}'.format(self.avg_thkns))
+        print('Max thickness = {:0.4f}'.format(self.max_thkns))
+        print('Min thickness = {:0.4f}'.format(self.min_thkns))
+        print('Thickness range = {:0.4f}\n\n'.format(self.max_thkns -
+                                                      self.min_thkns))
+
+    def save_probe_data_csv(self, filename='probe_data.csv'):
+        file = open(filename, 'w')
+        file.write('"X", "Y", "THK"\n')
+        for dp in self.probe_samples:
+            file.write('{:0.3f}, {:0.3f}, {:0.4f}\n'
+                       .format(dp[0][0], dp[0][1], dp[1]))
+        file.close()
 
     def probe_single(self, location, probe_d=1):
         '''
@@ -448,8 +451,6 @@ class NetModel:
                 self.probe_pts.append((x, y))
             y += md_spacing
 
-        return
-
     def add_probe_pts_from_file(self, filename, md_start=0, md_end=0):
         '''
         Adds probing points to list from CSV file.
@@ -477,7 +478,7 @@ class NetModel:
         elif md_end == 0:
             one_pass = True
 
-        y_pos = 0
+        y_pos = md_start
         while one_pass or (y_pos <= md_end):
             for loc in locs:
                 x_pos = loc[0]
@@ -485,19 +486,23 @@ class NetModel:
                 if one_pass or (y_pos <= md_end):
                     self.probe_pts.append((x_pos, y_pos))
             one_pass = False
-        return
 
     def execute_probe(self, probe_d=1):
         '''Probes all points in list.'''
         self.probe_samples.clear()
+        measurements = []
         for pt in self.probe_pts:
-            self.probe_samples.append((pt, self.probe_single(pt), probe_d))
-        return
+            thkns = self.probe_single(pt)
+            self.probe_samples.append((pt, thkns, probe_d))
+            measurements.append(thkns)
+
+        self.min_thkns = min(measurements)
+        self.max_thkns = max(measurements)
+        self.avg_thkns = sum(measurements) / len(measurements)
 
     def clear_probe_pts(self):
         ''' Clears probe points from list.'''
         self.probe_pts.clear()
-        return
 
     def distance(self, pt1, pt2):
         '''
@@ -530,7 +535,6 @@ class NetModel:
 
         plt.colorbar()
         plt.show()
-        return
 
     def plot_3d_points(self):
         '''
@@ -561,7 +565,6 @@ class NetModel:
         plt.axis('equal')
 
         plt.show()
-        return
 
     def plot_2d_contour(self, include_probe_pts=False):
         '''
@@ -603,11 +606,10 @@ class NetModel:
             probe_d = 1.
             pts = [(x[0], x[1] % self.net_length) for x in self.probe_pts]
             for pt in pts:
-                circle = plt.Circle(pt, probe_d / 2, color = 'b')
+                circle = plt.Circle(pt, probe_d / 2, color='b')
                 ax.add_artist(circle)
 
         plt.show()
-        return
 
     def save_pickle(self, filename):
         '''
@@ -623,7 +625,12 @@ class NetModel:
                         self.angle_out,
                         self.spi_in,
                         self.tol,
-                        self.knots)
+                        self.knots,
+                        self.probe_pts,
+                        self.probe_samples,
+                        self.min_thkns,
+                        self.max_thkns,
+                        self.avg_thkns)
 
         outfile = open(filename, 'wb')
         dump(pickle_tuple, outfile, compression='gzip')
@@ -652,15 +659,18 @@ class NetModel:
         self.spi_in = indata[7]
         self.tol = indata[8]
         self.knots = indata[9]
+        self.probe_pts = indata[10]
+        self.probe_samples = indata[11]
+        self.min_thkns = indata[12]
+        self.max_thkns = indata[13]
+        self.avg_thkns = indata[14]
 
         self.spi_in = (self.slots_in /
                        (self.net_width * sin((pi / 2.) + self.angle_in)))
         self.spi_out = (self.slots_out /
                         (self.net_width * sin((pi / 2.) + self.angle_out)))
 
-        return
-
-    def save_csv(self, filename):
+    def save_csv(self, filename='net_data.csv'):
         '''
         Saves net data to csv file.
         '''
@@ -706,13 +716,11 @@ class NetModel:
                                     knot['thickness'], knot['slot_in'],
                                     knot['slot_out']))
 
-        return
-
 
 if __name__ == '__main__':
 
     NET = NetModel()
-    NET.create_net(250, 250, pi / 4, pi / 4, 40, 2, .03)
+    NET.create_net(100, 100, pi / 4, pi / 4, 40, 2, .03)
     NET.outdie_variator(1, .005, offset=pi)
     NET.indie_variator(1, .005)
     NET.md_variator(1, .005)
@@ -722,6 +730,8 @@ if __name__ == '__main__':
     NET.add_probe_pts_from_file('probe_pts.csv', md_end=120)
 
     NET.plot_2d_contour(include_probe_pts=True)
+    NET.execute_probe()
+    NET.save_probe_data_csv()
 
     # NET.plot_2D_contour()
     # NET.normalize_range(.004)
