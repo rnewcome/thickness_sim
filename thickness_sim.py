@@ -395,11 +395,10 @@ class NetModel:
     def print_probe_stats(self):
         '''Prints stats from current thickness probe data.'''
         print('\nNumber of samples = {:d}'.format(len(self.probe_samples)))
-        print('Average thickness = {:0.4f}'.format(self.avg_thkns))
-        print('Max thickness = {:0.4f}'.format(self.max_thkns))
-        print('Min thickness = {:0.4f}'.format(self.probe_min_thkns))
-        print('Thickness range = {:0.4f}\n\n'.format(self.max_thkns -
-                                                      self.probe_min_thkns))
+        print('Average thickness = {:0.4f}'.format(self.avg_probe_thkns()))
+        print('Max thickness = {:0.4f}'.format(self.max_probe_thkns()))
+        print('Min thickness = {:0.4f}'.format(self.min_probe_thkns()))
+        print('Thickness range = {:0.4f}\n\n'.format(self.thkns_range_probe()))
 
     def save_probe_data_csv(self, filename='probe_data.csv'):
         file = open(filename, 'w')
@@ -588,7 +587,7 @@ class NetModel:
 
         plt.show()
 
-    def plot_2d_contour(self, include_probe_pts=False):
+    def plot_2d_contour(self, include_probe_pts=True):
         '''
         Creates 2D color contour of thickness data.
         '''
