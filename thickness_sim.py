@@ -9,10 +9,10 @@ Angles are in radians.  You must use the same units for all lengths.  Whatever
 you put in is what you will get out.
 
 X=0, Y=0 is assumed to be bottom left of sample.
-+X is across sheet to right
-+Y is in the machine direction
++X is across web with 0 at one edge (by convention I call it right edge)
++Y is in the machine direction with 0 at oldest part of net if measuring inline.
 
-Location is a vector [X, Y]
+Location is a vector (X, Y)
 
 """
 
@@ -38,22 +38,33 @@ class NetModel:
     several included methods.
     '''
     def __init__(self):
+        # contains list of (x, y) that are to be sampled.
         self.probe_pts = []
+        # contains list of samples taken of form ((x, y, thkns, probe_d), ...)
         self.probe_samples = []
+        # nominal thickness of net.
         self.net_thickness = 0.
+        # width of net sample
         self.net_width = 0
+        # Length of net sample in length units.
         self.net_length = 0
+        # Number of slots in inside die.
         self.slots_in = 0
+        # Number of slots in outside die.
         self.slots_out = 0
+        # Calculated strands per in inside die strands.
         self.spi_in = 0
+        # Calculated strands per in outside die strands.
         self.spi_out = 0
+        # nominal angle of inside die strands.
         self.angle_in = 0
+        # nominal angle of outside die strands.
         self.angle_out = 0
+        # list of knots of form ((x, y), thkns, slot_in, slot_out),...)
         self.knots = []
+        # tolerance used on many location tests.
         self.tol = 0.
-        self.min_thkns = 0
-        self.max_thkns = 0
-        self.avg_thkns = 0
+
 
     def create_net(self, slots_in, slots_out, angle_in, angle_out, net_width,
                    net_length, net_thickness):
@@ -386,9 +397,9 @@ class NetModel:
         print('\nNumber of samples = {:d}'.format(len(self.probe_samples)))
         print('Average thickness = {:0.4f}'.format(self.avg_thkns))
         print('Max thickness = {:0.4f}'.format(self.max_thkns))
-        print('Min thickness = {:0.4f}'.format(self.min_thkns))
+        print('Min thickness = {:0.4f}'.format(self.probe_min_thkns))
         print('Thickness range = {:0.4f}\n\n'.format(self.max_thkns -
-                                                      self.min_thkns))
+                                                      self.probe_min_thkns))
 
     def save_probe_data_csv(self, filename='probe_data.csv'):
         file = open(filename, 'w')
@@ -490,19 +501,30 @@ class NetModel:
     def execute_probe(self, probe_d=1):
         '''Probes all points in list.'''
         self.probe_samples.clear()
-        measurements = []
         for pt in self.probe_pts:
             thkns = self.probe_single(pt)
             self.probe_samples.append((pt, thkns, probe_d))
-            measurements.append(thkns)
-
-        self.min_thkns = min(measurements)
-        self.max_thkns = max(measurements)
-        self.avg_thkns = sum(measurements) / len(measurements)
 
     def clear_probe_pts(self):
         ''' Clears probe points from list.'''
         self.probe_pts.clear()
+        self.probe_samples.clear()
+
+    def max_probe_thkns(self):
+        return max([x[1] for x in self.probe_samples])
+
+    def min_probe_thkns(self):
+        return min([x[1] for x in self.probe_samples])
+
+    def avg_probe_thkns(self):
+        measurements = [x[1] for x in self.probe_samples]
+        if len(measurements) > 0:
+            return sum(measurements) / len(measurements)
+        else:
+            return 0
+
+    def thkns_range_probe(self):
+        return self.max_probe_thkns() - self.min_probe_thkns()
 
     def distance(self, pt1, pt2):
         '''
@@ -627,10 +649,7 @@ class NetModel:
                         self.tol,
                         self.knots,
                         self.probe_pts,
-                        self.probe_samples,
-                        self.min_thkns,
-                        self.max_thkns,
-                        self.avg_thkns)
+                        self.probe_samples)
 
         outfile = open(filename, 'wb')
         dump(pickle_tuple, outfile, compression='gzip')
@@ -661,9 +680,6 @@ class NetModel:
         self.knots = indata[9]
         self.probe_pts = indata[10]
         self.probe_samples = indata[11]
-        self.min_thkns = indata[12]
-        self.max_thkns = indata[13]
-        self.avg_thkns = indata[14]
 
         self.spi_in = (self.slots_in /
                        (self.net_width * sin((pi / 2.) + self.angle_in)))
