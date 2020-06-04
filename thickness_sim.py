@@ -447,7 +447,7 @@ class NetModel:
 
         probe_d = diameter of the probe.
         '''
-        x_locs = [(x + 0.5) * self.net_width / n_points
+        x_pts = [(x + 0.5) * self.net_width / n_points
                   for x in range(n_points)]
 
         if md_end < 0:
@@ -457,9 +457,42 @@ class NetModel:
 
         y = md_start
         while y <= md_end:
-            for x in x_locs:
+            for x in x_pts:
                 self.probe_pts.append((x, y))
             y += md_spacing
+
+    def add_probe_pts_from_list(self, pts, md_start=0, md_end=0):
+        '''
+        Adds probing points to list from list.
+
+        pts = List of x,y data points of form ((x, y), ...).  0 <= x <= 1.
+              Actual probe position is x * net_width.  Y is offset from previous
+                   md point, or md_start in the case of the 1st point.
+
+        md_start = offset in machine direction from start of data to 1st data
+                   point.
+
+        md_end = Stopping point.  If < 0 it is set equal to net_length.  If = 0
+                 it is set to pass through datafile once.  If > 0 it will
+                 pass through data repeatedly until locating is greater than
+        '''
+        one_pass = False
+        if md_end < 0:
+            md_end = self.net_length
+        elif md_end == 0:
+            one_pass = True
+
+        y_pos = md_start
+        n_passes = 1
+        while ((one_pass and n_passes <= 1) or
+               (not one_pass and y_pos <= md_end)):
+            for pt in pts:
+                x_pos = pt[0] * self.net_width
+                y_pos += pt[1]
+                if one_pass or (y_pos <= md_end):
+                    self.probe_pts.append((x_pos, y_pos))
+            n_passes += 1
+
 
     def add_probe_pts_from_file(self, filename, md_start=0, md_end=0):
         '''
@@ -476,31 +509,18 @@ class NetModel:
                  it is set to pass through datafile once.  If > 0 it will
                  pass through data repeatedly until locating is greater than
         '''
-        locs = []
+        pts = []
         with open(filename) as csv_data_file:
             csv_reader = csv.reader(csv_data_file)
             for row in csv_reader:
                 if float(row[0]) < 0 or float(row[0]) > 1:
                     raise ValueError('X = {}, must be 0 <= X <=1'
                                      .format(row[0]))
-                x_pos = float(row[0]) * self.net_width
+                x_pos = float(row[0])
                 y_move = float(row[1])
-                locs.append((x_pos, y_move))
+                pts.append((x_pos, y_move))
 
-        one_pass = False
-        if md_end < 0:
-            md_end = self.net_length
-        elif md_end == 0:
-            one_pass = True
-
-        y_pos = md_start
-        while one_pass or (y_pos <= md_end):
-            for loc in locs:
-                x_pos = loc[0]
-                y_pos += loc[1]
-                if one_pass or (y_pos <= md_end):
-                    self.probe_pts.append((x_pos, y_pos))
-            one_pass = False
+        self.add_probe_pts_from_list(pts, md_start, md_end)
 
     def execute_probe(self, probe_d=1):
         '''Probes all points in list.'''
@@ -748,6 +768,7 @@ if __name__ == '__main__':
     NET.print_net_stats()
     NET.add_probe_line_across(24, md_end=120)
     NET.add_probe_pts_from_file('probe_pts.csv', md_end=120)
+    NET.add_probe_pts_from_list(((.5, 0),))
 
     NET.plot_2d_contour(include_probe_pts=True)
     NET.execute_probe()
