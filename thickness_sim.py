@@ -465,7 +465,9 @@ class NetModel:
         '''
         Adds probing points to list from CSV file.
 
-        filename = name of csv file with x,y data points.
+        filename = name of csv file with x,y data points.  0 <= x <= 1 Actual
+                   probe position is x * net_width.  Y is offset from previous
+                   md point, or md_start in the case of the 1st point.
 
         md_start = offset in machine direction from start of data to 1st data
                    point.
@@ -478,6 +480,9 @@ class NetModel:
         with open(filename) as csv_data_file:
             csv_reader = csv.reader(csv_data_file)
             for row in csv_reader:
+                if float(row[0]) < 0 or float(row[0]) > 1:
+                    raise ValueError('X = {}, must be 0 <= X <=1'
+                                     .format(row[0]))
                 x_pos = float(row[0]) * self.net_width
                 y_move = float(row[1])
                 locs.append((x_pos, y_move))
