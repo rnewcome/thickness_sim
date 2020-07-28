@@ -467,13 +467,13 @@ class NetModel:
 
         pts = List of x,y data points of form ((x, y), ...).  0 <= x <= 1.
               Actual probe position is x * net_width.  Y is offset from previous
-                   md point, or md_start in the case of the 1st point.
+              md point, or md_start in the case of the 1st point.
 
         md_start = offset in machine direction from start of data to 1st data
                    point.
 
         md_end = Stopping point.  If < 0 it is set equal to net_length.  If = 0
-                 it is set to pass through datafile once.  If > 0 it will
+                 it is set to pass through list once.  If > 0 it will
                  pass through data repeatedly until locating is greater than
         '''
         one_pass = False
