@@ -27,6 +27,7 @@ import scipy.interpolate
 import numpy as np
 # import pickle
 from compress_pickle import dump, load
+import pandas as pd
 
 
 class NetModel:
@@ -416,13 +417,17 @@ class NetModel:
         probe_d - diameter of probe
         '''
         tkns = 0
-        for knot in self.knots:
-            if (self.distance(knot['location'], (location[0],
-                                                 location[1] % self.net_width))
-                    <= (probe_d / 2) and knot['thickness'] > tkns):
-                tkns = knot['thickness']
+        probed_knots = self.knot_df[((self.knot_df['x'] - location[0])**2 +
+                                    (self.knot_df['y'] - location[1])**2) <=
+                                    probe_d**2]
+        thickest = probed_knots['thkns'].max()
+        # for knot in self.knots:
+        #     if (self.distance(knot['location'], (location[0],
+        #                                          location[1] % self.net_width))
+        #             <= (probe_d / 2) and knot['thickness'] > tkns):
+        #         tkns = knot['thickness']
 
-        return tkns
+        return thickest
 
     def add_probe_line_across(self, md_start=1, md_end=0, md_spacing=12,
                               n_points=10):
@@ -556,6 +561,29 @@ class NetModel:
         (x, y).
         '''
         return sqrt((pt2[0] - pt1[0])**2 + (pt2[1] - pt1[1])**2)
+
+    def create_dataframe(self):
+        '''Creates Pandas DataFrame from knot list'''
+        knot_dict = {}
+        x = []
+        y = []
+        thkns = []
+        slot_in = []
+        slot_out = []
+        for pt in self.knots:
+            x.append(pt['location'][0])
+            y.append(pt['location'][1])
+            thkns.append(pt['thickness'])
+            slot_in.append(pt['slot_in'])
+            slot_out.append(pt['slot_out'])
+        knot_dict['x'] = x
+        knot_dict['y'] = y
+        knot_dict['thkns'] = thkns
+        knot_dict['slot_in'] = slot_in
+        knot_dict['slot_out'] = slot_out
+
+        self.knot_df = pd.DataFrame(knot_dict)
+
 
     def plot_2d_points(self):
         '''
@@ -764,15 +792,20 @@ if __name__ == '__main__':
     NET.outdie_variator(1, .005, offset=pi)
     NET.indie_variator(1, .005)
     NET.md_variator(1, .005)
+    NET.create_dataframe()
 
-    NET.print_net_stats()
-    NET.add_probe_line_across(24, md_end=120)
-    NET.add_probe_pts_from_file('probe_pts.csv', md_end=120)
-    NET.add_probe_pts_from_list(((.5, 0),))
-
-    NET.plot_2d_contour(include_probe_pts=True)
+    NET.add_probe_line_across(20)
     NET.execute_probe()
-    NET.save_probe_data_csv()
+    NET.print_probe_data()
+
+    # NET.print_net_stats()
+    # NET.add_probe_line_across(24, md_end=120)
+    # NET.add_probe_pts_from_file('probe_pts.csv', md_end=120)
+    # NET.add_probe_pts_from_list(((.5, 0),))
+
+    # NET.plot_2d_contour(include_probe_pts=True)
+    # NET.execute_probe()
+    # NET.save_probe_data_csv()
 
     # NET.plot_2D_contour()
     # NET.normalize_range(.004)
