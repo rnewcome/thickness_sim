@@ -65,6 +65,8 @@ class NetModel:
         self.knots = []
         # tolerance used on many location tests.
         self.tol = 0.
+        # boolean indicating of pandas dataframe is up-to-date.
+        self.df_up_to_date = False
 
 
     def create_net(self, slots_in, slots_out, angle_in, angle_out, net_width,
@@ -227,6 +229,8 @@ class NetModel:
 
             cpt = newpt_v2_pos(rowstart)
 
+        self.df_up_to_date = False
+
     def td_variator(self, cycles, magnitude, offset=0):
         '''
         Creates variation across the web.
@@ -239,6 +243,7 @@ class NetModel:
             variation = magnitude * sin((2.0 * pi * cycles * x /
                                          self.net_width) + offset)
             knot['thickness'] += variation
+            self.df_up_to_date = False
 
     def md_variator(self, cycles, magnitude, offset=0):
         '''
@@ -259,6 +264,7 @@ class NetModel:
             y = knot['location'][1]
             variation = magnitude * sin(2.0 * pi * (y * cycles / Ldr) + offset)
             knot['thickness'] += variation
+            self.df_up_to_date = False
 
     def indie_variator(self, cycles, magnitude, offset=0):
         '''
@@ -273,6 +279,7 @@ class NetModel:
                                          knot['slot_in'] / self.slots_in) +
                                         offset)
             knot['thickness'] += variation
+            self.df_up_to_date = False
 
     def outdie_variator(self, cycles, magnitude, offset=0):
         '''
@@ -285,6 +292,7 @@ class NetModel:
                                          knot['slot_out'] / self.slots_out) +
                                         offset)
             knot['thickness'] += variation
+            self.df_up_to_date = False
 
     def set_thickness(self, new_thkns=-1):
         '''
@@ -300,6 +308,9 @@ class NetModel:
         for knot in self.knots:
             knot['thickness'] = new_thkns
 
+        self.df_up_to_date = False
+
+
     def set_average(self, new_average):
         '''
         Adds same amount to each knot to adjust average thickness from
@@ -312,6 +323,7 @@ class NetModel:
             knot['thickness'] += delta
 
         self.net_thickness = new_average
+        self.df_up_to_date = False
 
     def set_range(self, new_range):
         '''
@@ -321,6 +333,7 @@ class NetModel:
         scaler = new_range / (maxt - mint)
         for knot in self.knots:
             knot['thickness'] = (knot['thickness'] - avg) * scaler + avg
+        self.df_up_to_date = False
 
     def copy(self):
         '''
@@ -416,7 +429,10 @@ class NetModel:
                    probed.
         probe_d - diameter of probe
         '''
-        tkns = 0
+
+        if not self.df_up_to_date:
+            self.create_dataframe()
+
         probed_knots = self.knot_df[((self.knot_df['x'] - location[0])**2 +
                                     (self.knot_df['y'] - location[1])**2) <=
                                     probe_d**2]
@@ -540,12 +556,15 @@ class NetModel:
         self.probe_samples.clear()
 
     def max_probe_thkns(self):
+        '''Returns maximum value of all probed points'''
         return max([x[1] for x in self.probe_samples])
 
     def min_probe_thkns(self):
+        '''Returns minimum value of all probed points'''
         return min([x[1] for x in self.probe_samples])
 
     def avg_probe_thkns(self):
+        '''Returns average of all probed points'''
         measurements = [x[1] for x in self.probe_samples]
         if len(measurements) > 0:
             return sum(measurements) / len(measurements)
@@ -553,6 +572,7 @@ class NetModel:
             return 0
 
     def thkns_range_probe(self):
+        '''Returns (max - min) value of all probed points'''
         return self.max_probe_thkns() - self.min_probe_thkns()
 
     def distance(self, pt1, pt2):
@@ -583,6 +603,7 @@ class NetModel:
         knot_dict['slot_out'] = slot_out
 
         self.knot_df = pd.DataFrame(knot_dict)
+        self.df_up_to_date = True
 
 
     def plot_2d_points(self):
