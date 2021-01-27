@@ -266,14 +266,16 @@ class NetModel:
             knot['thickness'] += variation
             self.df_up_to_date = False
 
-    def indie_variator(self, cycles, magnitude, offset=0):
-        '''
-        Applies sinusoidal variation following inside die slots.
+    def indie_variator(self, cycles, magnitude, offset=0.):
+        '''Applies sinusoidal variation following inside die slots.
 
-        cycles - number of sinusoidal cycles around inside die.
-
-        magnitude - max amount added or subtracted to knots.
+        Args:
+            cycles ([float]): number of sinusoidal cycles around inside die.
+            magnitude ([float]): max amount added or subtracted to knots.
+            offset (float, optional): Offset in length units perpendicular to
+                                      inside die strands. Defaults to 0.
         '''
+
         for knot in self.knots:
             variation = magnitude * sin((2.0 * pi * cycles *
                                          knot['slot_in'] / self.slots_in) +
@@ -282,11 +284,14 @@ class NetModel:
             self.df_up_to_date = False
 
     def outdie_variator(self, cycles, magnitude, offset=0):
-        '''
-        Applies sinusoidal variation following outside die slots.
-        cycles - number of sinusoidal cycles around outside die.
-        magnitude - max amount added or subtracted to knots.
-        '''
+        """Applies sinusoidal variation following outside die slots.
+
+        Args:
+            cycles ([float]): number of sinusoidal cycles around outside die.
+            magnitude ([float]): max amount added or subtracted to knots.
+            offset (int, optional): Offset in length units perpendicular to
+                                    outside die strands. Defaults to 0.
+        """
         for knot in self.knots:
             variation = magnitude * sin((2.0 * pi * cycles *
                                          knot['slot_out'] / self.slots_out) +
@@ -295,10 +300,12 @@ class NetModel:
             self.df_up_to_date = False
 
     def set_thickness(self, new_thkns=-1):
-        '''
-        Sets thickess of all knots to new_thkns.  If no new_thkns is given the
-        thickness is reset to initial thickness.  This eliminates all
-        variations.
+        '''Sets thickess of all knots to new_thkns.  If no new_thkns is given
+           the thickness is reset to initial thickness.  This eliminates all
+           variations.
+
+        Args:
+            new_thkns (float, optional): Desired thickness. Defaults to -1.
         '''
         if new_thkns == -1:
             new_thkns = self.net_thickness
@@ -434,7 +441,8 @@ class NetModel:
             self.create_dataframe()
 
         probed_knots = self.knot_df[((self.knot_df['x'] - location[0])**2 +
-                                    (self.knot_df['y'] - location[1])**2) <=
+                                    (self.knot_df['y'] -
+                                     (location[1]) % self.net_length)**2) <=
                                     probe_d**2]
         thickest = probed_knots['thkns'].max()
         # for knot in self.knots:
